@@ -25,6 +25,7 @@ import torchvision.models as models
 
 from clip.custom_clip import get_coop
 from clip.cocoop import get_cocoop
+# 在这里定义了不同的模板
 from data.imagnet_prompts import imagenet_classes
 from data.datautils import AugMixAugmenter, build_dataset
 from utils.tools import Summary, AverageMeter, ProgressMeter, accuracy, load_model_weight, set_random_seed
@@ -103,6 +104,7 @@ def main_worker(gpu, args):
         classnames = eval("{}_classes".format(args.test_sets.lower()))
     else:
         classnames = imagenet_classes
+    # get model
     if args.cocoop:
         model = get_cocoop(args.arch, args.test_sets, 'cpu', args.n_ctx)
         assert args.load is not None
@@ -158,8 +160,10 @@ def main_worker(gpu, args):
 
     
     # iterating through eval datasets
-    datasets = args.test_sets.split("/")
+    datasets = args.test_sets.split("/")    # ['A', 'R', 'V', 'K', 'I']
     results = {}
+    '''A: ImageNet-A, R: ImageNet-R, V: ImageNet-V, K: ImageNet-K, I: ImageNet-I'''
+    # 循环处理每个数据集，使用label_mask来选择数据集中的类别
     for set_id in datasets:
         if args.tpt:
             base_transform = transforms.Compose([
@@ -200,6 +204,7 @@ def main_worker(gpu, args):
                     classnames = [classnames_all[i] for i in label_mask]
             else:
                 classnames = classnames_all
+        # reset classnames for each model
         if args.cocoop:
             model.prompt_generator.reset_classnames(classnames, args.arch)
             model = model.cpu()
@@ -214,7 +219,7 @@ def main_worker(gpu, args):
                     val_dataset,
                     batch_size=batchsize, shuffle=True,
                     num_workers=args.workers, pin_memory=True)
-            
+        # evaluate the model
         results[set_id] = test_time_adapt_eval(val_loader, model, model_state, optimizer, optim_state, scaler, args)
         del val_dataset, val_loader
         try:
@@ -238,7 +243,7 @@ def test_time_adapt_eval(val_loader, model, model_state, optimizer, optim_state,
     batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
     top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
     top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
-
+    # 创建一个ProgressMeter对象，用于显示进度
     progress = ProgressMeter(
         len(val_loader),
         [batch_time, top1, top5],
@@ -264,6 +269,7 @@ def test_time_adapt_eval(val_loader, model, model_state, optimizer, optim_state,
             images = images.cuda(args.gpu, non_blocking=True)
             image = images
         target = target.cuda(args.gpu, non_blocking=True)
+        # 测试时对模型的提示词进行动态调整
         if args.tpt:
             images = torch.cat(images, dim=0)
 
@@ -273,6 +279,7 @@ def test_time_adapt_eval(val_loader, model, model_state, optimizer, optim_state,
                 with torch.no_grad():
                     model.reset()
             optimizer.load_state_dict(optim_state)
+            # 测试时对模型的提示词进行动态调整
             test_time_tuning(model, images, optimizer, scaler, args)
         else:
             with torch.no_grad():

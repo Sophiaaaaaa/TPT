@@ -65,9 +65,9 @@ class AverageMeter(object):
 
 class ProgressMeter(object):
     def __init__(self, num_batches, meters, prefix=""):
-        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
-        self.meters = meters
-        self.prefix = prefix
+        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)  
+        self.meters = meters    # 存储meter对象的列表
+        self.prefix = prefix    # 显示前缀
 
     def display(self, batch):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
