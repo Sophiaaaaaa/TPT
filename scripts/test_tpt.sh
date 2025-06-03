@@ -1,7 +1,7 @@
 #!/bin/bash
 
 data_root='/path/to/your/data/root'
-testsets=$1
+testsets=$1     # input from command line
 arch=RN50
 # arch=ViT-B/16
 bs=64
