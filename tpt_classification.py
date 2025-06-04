@@ -117,8 +117,8 @@ def main_worker(gpu, args):
             pretrained_ctx = torch.load(args.load)['state_dict']['ctx']
             assert pretrained_ctx.size()[0] == args.n_ctx
             with torch.no_grad():
-                model.prompt_learner[0].ctx.copy_(pretrained_ctx)
-                model.prompt_learner[0].ctx_init_state = pretrained_ctx
+                model.prompt_learner.ctx.copy_(pretrained_ctx)
+                model.prompt_learner.ctx_init_state = pretrained_ctx
         model_state = None
 
     for name, param in model.named_parameters():
@@ -213,6 +213,7 @@ def main_worker(gpu, args):
         else:
             model.reset_classnames(classnames, args.arch)
 
+        # load data
         val_dataset = build_dataset(set_id, data_transform, args.data, mode=args.dataset_mode)
         print("number of test samples: {}".format(len(val_dataset)))
         val_loader = torch.utils.data.DataLoader(
