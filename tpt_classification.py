@@ -51,7 +51,7 @@ def avg_entropy(outputs):
     avg_logits = torch.clamp(avg_logits, min=min_real)
     return -(avg_logits * torch.exp(avg_logits)).sum(dim=-1)
 
-
+# inputs: images from several views
 def test_time_tuning(model, inputs, optimizer, scaler, args):
     if args.cocoop:
         image_feature, pgen_ctx = inputs
@@ -69,8 +69,9 @@ def test_time_tuning(model, inputs, optimizer, scaler, args):
             if selected_idx is not None:
                 output = output[selected_idx]
             else:
+                # 选择置信样本
                 output, selected_idx = select_confident_samples(output, args.selection_p)
-
+            # 计算不同view的平均交叉熵
             loss = avg_entropy(output)
         
         optimizer.zero_grad()
@@ -163,15 +164,16 @@ def main_worker(gpu, args):
     datasets = args.test_sets.split("/")    # ['A', 'R', 'V', 'K', 'I']
     results = {}
     '''A: ImageNet-A, R: ImageNet-R, V: ImageNet-V, K: ImageNet-K, I: ImageNet-I'''
-    # 循环处理每个数据集，使用label_mask来选择数据集中的类别
+    # 循环微调每个数据集
     for set_id in datasets:
         if args.tpt:
             base_transform = transforms.Compose([
-                transforms.Resize(args.resolution, interpolation=BICUBIC),
+                transforms.Resize(args.resolution, interpolation=BICUBIC),  # 224
                 transforms.CenterCrop(args.resolution)])
             preprocess = transforms.Compose([
                 transforms.ToTensor(),
                 normalize])
+            # 返回多个view
             data_transform = AugMixAugmenter(base_transform, preprocess, n_views=args.batch_size-1, 
                                             augmix=len(set_id)>1)
             batchsize = 1
@@ -211,9 +213,11 @@ def main_worker(gpu, args):
             model_state = model.state_dict()
             model = model.cuda(args.gpu)
         else:
+            # prompt initialization
             model.reset_classnames(classnames, args.arch)
 
         # load data
+        # datasets, transform_method, data_root, mode='test'
         val_dataset = build_dataset(set_id, data_transform, args.data, mode=args.dataset_mode)
         print("number of test samples: {}".format(len(val_dataset)))
         val_loader = torch.utils.data.DataLoader(
@@ -270,11 +274,12 @@ def test_time_adapt_eval(val_loader, model, model_state, optimizer, optim_state,
             images = images.cuda(args.gpu, non_blocking=True)
             image = images
         target = target.cuda(args.gpu, non_blocking=True)
-        # 测试时对模型的提示词进行动态调整
+
         if args.tpt:
             images = torch.cat(images, dim=0)
 
         # reset the tunable prompt to its initial state
+        # for coop and fixed prompt
         if not args.cocoop: # no need to reset cocoop because it's fixed
             if args.tta_steps > 0:
                 with torch.no_grad():
@@ -282,6 +287,7 @@ def test_time_adapt_eval(val_loader, model, model_state, optimizer, optim_state,
             optimizer.load_state_dict(optim_state)
             # 测试时对模型的提示词进行动态调整
             test_time_tuning(model, images, optimizer, scaler, args)
+        # for cocoop
         else:
             with torch.no_grad():
                 with torch.cuda.amp.autocast():

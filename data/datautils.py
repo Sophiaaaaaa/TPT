@@ -35,12 +35,14 @@ ID_to_DIRNAME={
     'eurosat': 'eurosat'
 }
 
+# datasets, transform_method, data_root, mode='test'
 def build_dataset(set_id, transform, data_root, mode='test', n_shot=None, split="all", bongard_anno=False):
     if set_id == 'I':
         # ImageNet validation set
         testdir = os.path.join(os.path.join(data_root, ID_to_DIRNAME[set_id]), 'val')
         testset = datasets.ImageFolder(testdir, transform=transform)
     elif set_id in ['A', 'K', 'R', 'V']:
+        # 直接使用整个数据集来做微调
         testdir = os.path.join(data_root, ID_to_DIRNAME[set_id])
         testset = datasets.ImageFolder(testdir, transform=transform)
     elif set_id in fewshot_datasets:
@@ -83,7 +85,7 @@ def augmix(image, preprocess, aug_list, severity=1):
     mix = m * x_processed + (1 - m) * mix
     return mix
 
-
+# 对输入图像进行AugMix增强（混合多种增强技术），生成多个不同视图
 class AugMixAugmenter(object):
     def __init__(self, base_transform, preprocess, n_views=2, augmix=False, 
                     severity=1):
